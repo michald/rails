@@ -23,6 +23,8 @@ module ActionView
 
       include TagHelper
 
+      mattr_accessor :link_rel_values, default: {}.with_indifferent_access
+
       module ClassMethods
         def _url_for_modules
           ActionView::RoutingUrlFor
@@ -202,6 +204,7 @@ module ActionView
         url = url_for(options)
         html_options["href"] ||= url
 
+        add_rel_values(html_options)
         content_tag("a", name || url, html_options, &block)
       end
 
@@ -688,8 +691,10 @@ module ActionView
         end
 
         def add_method_to_attributes!(html_options, method)
-          if method_not_get_method?(method) && !html_options["rel"]&.match?(/nofollow/)
-            if html_options["rel"].blank?
+          if method_not_get_method?(method) && !html_options["rel"]&.include?("nofollow")
+            if html_options["rel"].is_a?(Hash)
+              html_options["rel"]["nofollow"] = true
+            elsif html_options["rel"].blank?
               html_options["rel"] = "nofollow"
             else
               html_options["rel"] = "#{html_options["rel"]} nofollow"
@@ -764,6 +769,27 @@ module ActionView
           end
 
           params.sort_by { |pair| pair[:name] }
+        end
+
+        def add_rel_values(html_options)
+          if html_options["rel"].is_a?(Hash)
+            link_rel_values.merge(html_options["rel"]).tap do
+              html_options["rel"] = ""
+            end.each do |rel_value, rel_condition|
+              rel_value_allowed?(rel_condition, html_options) || next
+              html_options["rel"] << " #{rel_value}"
+            end
+          else
+            link_rel_values.each do |rel_value, rel_condition|
+              rel_value_allowed?(rel_condition, html_options) || next
+              html_options["rel"]&.include?(rel_value) && next
+              html_options["rel"] = "#{html_options["rel"]} #{rel_value}".lstrip
+            end
+          end
+        end
+
+        def rel_value_allowed?(rel_condition, html_options)
+          rel_condition.respond_to?(:call) ? rel_condition.call(html_options) : rel_condition
         end
     end
   end

@@ -41,6 +41,13 @@ module ActionView
     end
 
     config.after_initialize do |app|
+      link_rel_values = app.config.action_view.delete(:link_rel_values)
+      if link_rel_values.is_a?(Hash)
+        ActionView::Helpers::UrlHelper.link_rel_values = link_rel_values.with_indifferent_access
+      end
+    end
+
+    config.after_initialize do |app|
       ActiveSupport.on_load(:action_view) do
         app.config.action_view.each do |k, v|
           if k == :raise_on_missing_translations
